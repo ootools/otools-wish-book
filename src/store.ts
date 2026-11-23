@@ -1,0 +1,371 @@
+import { computed, ref } from 'vue';
+import { ApiError, loadCloudData, saveCloudData } from './api';
+import { loadLocal, requestUserToken, saveLocal, type LoginRequiredError } from './host';
+import {
+  SLOT_COUNT,
+  emptySlots,
+  type BookState,
+  type Child,
+  type SlotState,
+  type StarSlot,
+  type Wish,
+} from './types';
+
+const makeId = (): string =>
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+const defaultState = (): BookState => ({
+  activeId: 'child-doudou',
+  children: [
+    {
+      id: 'child-doudou',
+      name: '朵朵',
+      birth: '2023-05-12',
+      hobby: '画画、小熊',
+      avatar: 'av-doudou',
+      slots: [
+        ...Array.from({ length: 9 }, (_, i): StarSlot => ({
+          state: i < 3 ? 'redeemed' : 'star',
+          note: i < 3 ? '已兑换' : '棒棒的表现',
+          at: Date.now() - (9 - i) * 86400000,
+        })),
+        ...emptySlots().slice(9),
+      ],
+    },
+    {
+      id: 'child-anan',
+      name: '安安',
+      birth: '2025-01-08',
+      hobby: '小兔、积木',
+      avatar: 'av-anan',
+      slots: [
+        ...Array.from({ length: 7 }, (): StarSlot => ({ state: 'star', note: '棒棒的表现', at: Date.now() })),
+        ...emptySlots().slice(7),
+      ],
+    },
+  ],
+  wishes: [
+    { id: 'wish-carousel', name: '旋转木马', icon: 'ic-carousel', cost: 25, done: false },
+    { id: 'wish-picnic', name: '亲子野餐', icon: 'ic-picnic', cost: 15, done: false },
+    { id: 'wish-sticker', name: '贴纸绘本', icon: 'ic-gift', cost: 10, done: true, doneAt: Date.now() },
+  ],
+});
+
+const normalizeSlots = (value: unknown): StarSlot[] => {
+  const source = Array.isArray(value) ? value : [];
+  const slots = emptySlots();
+  for (let i = 0; i < SLOT_COUNT; i += 1) {
+    const item = source[i] as Partial<StarSlot> | undefined;
+    const state: SlotState = item?.state === 'star' || item?.state === 'redeemed' ? item.state : 'empty';
+    slots[i] = {
+      state,
+      ...(typeof item?.note === 'string' ? { note: item.note } : {}),
+      ...(typeof item?.at === 'number' ? { at: item.at } : {}),
+    };
+  }
+  return slots;
+};
+
+const normalizeState = (value: unknown): BookState => {
+  const source = value && typeof value === 'object' ? (value as Partial<BookState>) : {};
+  const children: Child[] = Array.isArray(source.children)
+    ? source.children
+        .filter((item): item is Child => Boolean(item && typeof item.id === 'string'))
+        .map((item) => ({
+          id: item.id,
+          name: String(item.name || '宝宝'),
+          birth: String(item.birth || ''),
+          hobby: String(item.hobby || ''),
+          avatar: item.avatar === 'av-anan' ? 'av-anan' : 'av-doudou',
+          slots: normalizeSlots(item.slots),
+        }))
+    : [];
+  if (!children.length) {
+    return defaultState();
+  }
+  const wishes: Wish[] = Array.isArray(source.wishes)
+    ? source.wishes
+        .filter((item): item is Wish => Boolean(item && typeof item.id === 'string'))
+        .map((item) => ({
+          id: item.id,
+          name: String(item.name || '心愿礼物'),
+          icon: typeof item.icon === 'string' ? item.icon : 'ic-gift',
+          cost: Math.max(1, Math.floor(Number(item.cost) || 1)),
+          done: item.done === true,
+          ...(typeof item.doneAt === 'number' ? { doneAt: item.doneAt } : {}),
+        }))
+    : [];
+  return {
+    children,
+    activeId: children.some((child) => child.id === source.activeId) ? String(source.activeId) : children[0].id,
+    wishes,
+  };
+};
+
+export const state = ref<BookState>(defaultState());
+export const status = ref<'loading' | 'ready' | 'login'>('loading');
+export const lastError = ref('');
+/** 需要弹窗提示「去设置登录」时设置；普通网络错误不弹窗。 */
+export const loginPrompt = ref<{ message: string; detail: string } | null>(null);
+const accessToken = ref('');
+const openid = ref('');
+
+export const activeChild = computed<Child>(
+  () => state.value.children.find((child) => child.id === state.value.activeId) || state.value.children[0],
+);
+export const childIndex = computed(() => Math.max(0, state.value.children.findIndex((c) => c.id === activeChild.value.id)));
+export const starCount = computed(() => activeChild.value.slots.filter((slot) => slot.state !== 'empty').length);
+export const redeemedCount = computed(() => activeChild.value.slots.filter((slot) => slot.state === 'redeemed').length);
+export const availableStars = computed(() => starCount.value - redeemedCount.value);
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** 绕开 TS 对 status 字面量的控制流收窄：异步续期可能已把它改成 login。 */
+const isLoginStatus = (): boolean => String(status.value) === 'login';
+
+/** 只把「宿主未登录 / 令牌失效」识别为需要弹窗，网络抖动不打扰用户。 */
+const LOGIN_REQUIRED_PATTERN = /未登录|请先登录|需要登录|登录已过期|not.?logged.?in|unauthor/i;
+const isLoginRequired = (error: unknown): boolean => {
+  if (error instanceof ApiError) {
+    return error.expired || LOGIN_REQUIRED_PATTERN.test(error.message);
+  }
+  const err = error as LoginRequiredError | undefined;
+  return Boolean(
+    err && (err.reason === 'not_logged_in' || LOGIN_REQUIRED_PATTERN.test(err.message || '')),
+  );
+};
+
+const promptLogin = (detail: string): void => {
+  status.value = 'login';
+  lastError.value = detail;
+  loginPrompt.value = {
+    message: '宿主尚未登录 OTools 账号，请在设置页登录后重试。',
+    detail,
+  };
+};
+
+const reportAuthFailure = (error: unknown): void => {
+  if (!isLoginRequired(error)) {
+    return;
+  }
+  accessToken.value = '';
+  promptLogin(error instanceof Error ? error.message : String(error));
+};
+
+/** 云端返回 401 时重新走 uTools 兼容令牌链路；并发只刷新一次。 */
+let refreshTask: Promise<boolean> | null = null;
+const refreshAccessToken = (): Promise<boolean> => {
+  if (!refreshTask) {
+    refreshTask = (async () => {
+      try {
+        const result = await requestUserToken();
+        accessToken.value = result.token;
+        if (result.openid) {
+          openid.value = result.openid;
+        }
+        return true;
+      } catch (error) {
+        reportAuthFailure(error);
+        return false;
+      }
+    })().finally(() => {
+      refreshTask = null;
+    });
+  }
+  return refreshTask;
+};
+
+/** 云读写统一入口：401 自动续期并重试一次；再次失败才提示登录。 */
+const withCloudToken = async <T>(run: (token: string) => Promise<T>): Promise<T | null> => {
+  try {
+    return await run(accessToken.value);
+  } catch (error) {
+    if (error instanceof ApiError && error.expired) {
+      if (!(await refreshAccessToken())) {
+        return null;
+      }
+      try {
+        return await run(accessToken.value);
+      } catch (retryError) {
+        reportAuthFailure(retryError);
+        return null;
+      }
+    }
+    reportAuthFailure(error);
+    return null;
+  }
+};
+
+export const dismissLoginPrompt = (): void => {
+  loginPrompt.value = null;
+};
+
+const schedulePersist = (): void => {
+  if (!accessToken.value) {
+    return;
+  }
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+  }
+  saveTimer = setTimeout(() => {
+    const snapshot = JSON.parse(JSON.stringify(state.value)) as BookState;
+    void withCloudToken((token) => saveCloudData(token, snapshot));
+    void saveLocal(`baby-wish-book:${openid.value}`, snapshot);
+  }, 200);
+};
+
+/** 启动：uTools 兼容令牌 → 云端数据（本地缓存兜底）。 */
+const runInitialize = async (): Promise<void> => {
+  status.value = 'loading';
+  lastError.value = '';
+  loginPrompt.value = null;
+  try {
+    const result = await requestUserToken();
+    accessToken.value = result.token;
+    openid.value = result.openid || '';
+  } catch (error) {
+    accessToken.value = '';
+    const detail = error instanceof Error ? error.message : String(error);
+    if (isLoginRequired(error)) {
+      promptLogin(detail);
+    } else {
+      status.value = 'login';
+      lastError.value = detail;
+    }
+    return;
+  }
+
+  const cacheKey = `baby-wish-book:${openid.value || 'anonymous'}`;
+  const cached = await loadLocal<BookState>(cacheKey);
+  if (cached) {
+    state.value = normalizeState(cached);
+  }
+
+  const remote = await withCloudToken((token) => loadCloudData<BookState>(token));
+  if (isLoginStatus()) {
+    // 401 续期失败已弹窗，保留本地缓存，不覆盖登录态。
+    return;
+  }
+  if (remote) {
+    state.value = normalizeState(remote);
+  } else if (!cached) {
+    state.value = defaultState();
+    schedulePersist();
+  }
+  status.value = 'ready';
+};
+
+/** 登录回来后 focus 与轮询可能同时触发，这里做单飞避免重复初始化。 */
+let initializeTask: Promise<void> | null = null;
+export function initialize(): Promise<void> {
+  if (!initializeTask) {
+    initializeTask = runInitialize().finally(() => {
+      initializeTask = null;
+    });
+  }
+  return initializeTask;
+}
+
+export function setActiveChild(id: string): void {
+  if (!state.value.children.some((child) => child.id === id)) {
+    return;
+  }
+  state.value.activeId = id;
+}
+
+export function upsertChild(input: Partial<Child> & { name: string }): void {
+  if (input.id && state.value.children.some((child) => child.id === input.id)) {
+    const child = state.value.children.find((item) => item.id === input.id)!;
+    child.name = input.name.trim() || '宝宝';
+    child.birth = input.birth || '';
+    child.hobby = input.hobby || '';
+    child.avatar = input.avatar || child.avatar;
+  } else {
+    const id = input.id || makeId();
+    state.value.children.push({
+      id,
+      name: input.name.trim() || '宝宝',
+      birth: input.birth || '',
+      hobby: input.hobby || '',
+      avatar: input.avatar || 'av-doudou',
+      slots: emptySlots(),
+    });
+    state.value.activeId = id;
+  }
+  schedulePersist();
+}
+
+export function removeChild(id: string): void {
+  if (state.value.children.length <= 1) {
+    return;
+  }
+  state.value.children = state.value.children.filter((child) => child.id !== id);
+  if (state.value.activeId === id) {
+    state.value.activeId = state.value.children[0].id;
+  }
+  schedulePersist();
+}
+
+/** 返回将要贴星的槽位索引；满 32 槽时返回空数组。 */
+export function previewStarSlots(count: number): number[] {
+  const slots = activeChild.value.slots;
+  const indexes: number[] = [];
+  for (let i = 0; i < slots.length && indexes.length < count; i += 1) {
+    if (slots[i].state === 'empty') {
+      indexes.push(i);
+    }
+  }
+  return indexes;
+}
+
+/** 真正写入星星（动画结束后调用）。 */
+export function commitStars(indexes: number[], note: string): void {
+  const now = Date.now();
+  for (const index of indexes) {
+    const slot = activeChild.value.slots[index];
+    if (slot && slot.state === 'empty') {
+      slot.state = 'star';
+      slot.note = note;
+      slot.at = now;
+    }
+  }
+  schedulePersist();
+}
+
+export function addWish(name: string, icon: string, cost: number): void {
+  const value = Math.max(1, Math.floor(cost || 1));
+  state.value.wishes.push({ id: makeId(), name: name.trim() || '心愿礼物', icon, cost: value, done: false });
+  schedulePersist();
+}
+
+export function removeWish(id: string): void {
+  state.value.wishes = state.value.wishes.filter((wish) => wish.id !== id);
+  schedulePersist();
+}
+
+/** 兑换：从当前页扣对应数量的可用星星，并盖上已兑换章。 */
+export function redeem(wishId: string): number[] {
+  const wish = state.value.wishes.find((item) => item.id === wishId);
+  if (!wish || wish.done || availableStars.value < wish.cost) {
+    return [];
+  }
+  const indexes: number[] = [];
+  for (let i = 0; i < activeChild.value.slots.length && indexes.length < wish.cost; i += 1) {
+    if (activeChild.value.slots[i].state === 'star') {
+      indexes.push(i);
+    }
+  }
+  const now = Date.now();
+  for (const index of indexes) {
+    const slot = activeChild.value.slots[index];
+    slot.state = 'redeemed';
+    slot.note = `兑换：${wish.name}`;
+    slot.at = now;
+  }
+  wish.done = true;
+  wish.doneAt = now;
+  schedulePersist();
+  return indexes;
+}

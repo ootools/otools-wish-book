@@ -1,0 +1,27 @@
+{
+  "name": "otools-baby-wish-book",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Baby wish passbook plugin for OTools",
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 6592 --strictPort",
+    "build": "vue-tsc --noEmit --pretty false && vite build",
+    "typecheck": "vue-tsc --noEmit --pretty false",
+    "preview": "node scripts/serve-dist.mjs 6593",
+    "pack": "npm run build && node scripts/pack-plugin.mjs && node scripts/verify-plugin.mjs",
+    "verify": "node scripts/verify-plugin.mjs",
+    "test": "node --test scripts/*.test.mjs"
+  },
+  "dependencies": {
+    "vue": "3.5.27"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.8",
+    "@vitejs/plugin-vue": "5.2.4",
+    "typescript": "5.9.3",
+    "vite": "6.4.1",
+    "vue-tsc": "3.3.11"
+  }
+}
