@@ -59,9 +59,17 @@ svg { display: block; }
   background: #ffe1e8;
   box-shadow: inset 0 1px 2px rgba(150, 70, 90, .45), 0 1px 0 rgba(255, 255, 255, .85);
 }
-.page { height: 100%; padding: 26px 26px 74px; overflow: auto; }
-.page::-webkit-scrollbar { width: 6px; }
-.page::-webkit-scrollbar-thumb { background: var(--pink-line); border-radius: 9px; }
+/* 整页 flex 铺满视口：内容区吃掉剩余高度，底部栏走正常文档流，不再绝对定位遮挡内容。 */
+.page {
+  height: 100%;
+  padding: 18px 26px 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.page > .page-head,
+.page > .page-strip,
+.page > .wish-banner { flex: none; }
 
 .page-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .page-head h2 { font-size: 22px; line-height: 1.3; margin: 0; color: var(--pink-cover-d); }
@@ -102,9 +110,10 @@ svg { display: block; }
 .btn.small { min-height: 34px; padding: 0 12px; font-size: 12px; border-radius: 10px; }
 
 .bottom-bar {
-  position: absolute;
-  left: 0; right: 0; bottom: 0;
+  position: relative;
+  flex: none;
   height: 66px;
+  margin: 8px -26px 0;
   background: linear-gradient(180deg, rgba(255, 246, 248, .92), #fff2f5);
   border-top: 1.5px solid var(--pink-line);
   display: flex; align-items: center; justify-content: center; gap: 12px;
@@ -136,7 +145,7 @@ svg { display: block; }
   -webkit-text-stroke: 1.4px #c94d68;
   text-shadow: 2px 3px 0 #d45b74, 4px 6px 10px rgba(150, 30, 60, .32);
 }
-.cover-right { padding: 46px 30px 80px; display: flex; flex-direction: column; gap: 14px; }
+.cover-right { padding: 30px 30px 24px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
 .cover-right .kicker { font-size: 11px; letter-spacing: 2px; color: var(--pink-cover-d); font-weight: 800; }
 .cover-right h1 { font-size: 26px; margin: 0; color: var(--pink-cover-d); }
 .cover-right .tagline { font-size: 13px; color: var(--text-2); }
@@ -165,7 +174,10 @@ svg { display: block; }
 .child-tab .star-mini svg { width: 14px; height: 14px; }
 
 /* ---------- star book ---------- */
-.book-layout { display: grid; grid-template-columns: minmax(0, 1fr) 196px; gap: 16px; height: calc(100% - 60px); }
+.book-layout {
+  display: grid; grid-template-columns: minmax(0, 1fr) 196px; gap: 16px;
+  flex: 1; min-height: 0;
+}
 .book-main {
   background: var(--pink-paper);
   border: 1.5px solid var(--pink-line);
@@ -181,11 +193,15 @@ svg { display: block; }
   flex: 1; min-height: 0;
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
-  grid-auto-rows: 1fr;
-  gap: 8px;
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+  place-items: center;
+  gap: clamp(4px, .8vh, 8px);
 }
+/* 槽位按视口高度收敛，窗口再矮也不把底部栏顶出去。 */
 .star-slot {
   position: relative;
+  width: min(clamp(26px, 9vh, 88px), 100%);
+  height: min(clamp(26px, 9vh, 88px), 100%);
   aspect-ratio: 1 / 1;
   border-radius: 50%;
   background: var(--pink-slot);
@@ -238,7 +254,7 @@ svg { display: block; }
 .wish-note textarea { flex: 1; resize: none; border: none; background: transparent; outline: none; font-size: 12px; }
 
 /* ---------- kids ---------- */
-.kid-list { display: flex; flex-direction: column; gap: 10px; }
+.kid-list { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; overflow-y: auto; }
 .kid-card {
   display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 12px; align-items: center;
   background: var(--pink-paper); border: 1.5px solid var(--pink-line);
@@ -263,7 +279,7 @@ svg { display: block; }
   padding: 10px 14px; font-size: 12px; color: var(--text-2); margin-bottom: 12px;
 }
 .wish-banner b { color: var(--pink-cover-d); }
-.wish-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.wish-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; flex: 1; min-height: 0; overflow-y: auto; align-content: start; }
 .wish-card {
   background: var(--pink-paper); border: 1.5px solid var(--pink-line);
   border-radius: var(--r-card); box-shadow: var(--sh-card);
@@ -354,10 +370,9 @@ svg { display: block; }
 .center-state .err { color: var(--seal); font-size: 11px; }
 
 @media (max-width: 860px) {
-  .page { padding-bottom: 78px; }
   .cover-page { grid-template-columns: 1fr; grid-template-rows: 220px 1fr; }
   .cover-title { font-size: 28px; top: 18px; left: 20px; }
-  .cover-right { padding: 18px 20px 76px; }
+  .cover-right { padding: 18px 20px 20px; }
   .book-layout { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
   .side-card { flex-direction: row; flex-wrap: wrap; }
   .wish-note { min-height: 60px; flex: 1 1 200px; }
