@@ -28,12 +28,12 @@
 
 - `controller/Open.php`：`temporary-token` / `baseinfo` / `user/login`，uTools 形状不变，补 packid 与官方 uid 返回。
 - `service/PluginIdentity.php`：packid 作用域、openid 派生、官方标记判定。
+- `service/PluginAccessToken.php`：**平台公共服务**，从 accessToken 解析 uid/packid，所有业务模块共用；不接触宿主 JWT。
 - `install/2026-11-23-otools-identity.sql`：仅给 `xy_otools_temp_token` 补 `packid` 列。
 
 **业务（独立模块）** `xystack/back-end/xycloud/app/_app/wishbook/`：
 
-- `controller/Book.php`：`POST /wishbook/book/data`，按 accessToken 解析 uid/packid 后读写。
-- `service/PluginAccessToken.php`：复用 otools 的令牌长度/packid 规则，从令牌记录解析归属，不接触 JWT。
+- `controller/Book.php`：`POST /wishbook/book/data`，调用 otools 的 `PluginAccessToken` 解析 uid/packid 后读写。
 - `service/BookData.php` + `install/2026-11-23-wishbook-data.sql`：自有表 `xy_wishbook_data`，唯一键 `(cloudId, packid, uid, dataKey)`。
 - `install/install.json`、`docs/API.md`、`tests/book_smoke.php`。
 
