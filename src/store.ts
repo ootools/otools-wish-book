@@ -104,6 +104,14 @@ const normalizeState = (value: unknown): BookState => {
   };
 };
 
+export type StorageMode = 'local' | 'cloud';
+/** 默认本机模式：不碰身份接口，数据存宿主本地文件；云端模式才需要登录。 */
+export const storageMode = ref<StorageMode>('local');
+const MODE_KEY = 'wish-book:mode';
+const LOCAL_DATA_KEY = 'wish-book:local';
+/** 本机 → 云端切换时，等登录成功后把当前存折作为云端初始数据上传。 */
+let pendingCloudUpload: BookState | null = null;
+
 export const state = ref<BookState>(defaultState());
 export const status = ref<'loading' | 'ready' | 'login'>('loading');
 export const lastError = ref('');
@@ -202,25 +210,47 @@ export const dismissLoginPrompt = (): void => {
   loginPrompt.value = null;
 };
 
+const snapshotState = (): BookState => JSON.parse(JSON.stringify(state.value)) as BookState;
+
+/** 本机模式只写宿主本地文件；云端模式写云端 + 本地缓存兜底。 */
 const schedulePersist = (): void => {
-  if (!accessToken.value) {
-    return;
-  }
   if (saveTimer) {
     clearTimeout(saveTimer);
   }
   saveTimer = setTimeout(() => {
-    const snapshot = JSON.parse(JSON.stringify(state.value)) as BookState;
+    const snapshot = snapshotState();
+    if (storageMode.value === 'local') {
+      void saveLocal(LOCAL_DATA_KEY, snapshot);
+      return;
+    }
+    if (!accessToken.value) {
+      return;
+    }
     void withCloudToken((token) => saveCloudData(token, snapshot));
     void saveLocal(`wish-book:${openid.value}`, snapshot);
   }, 200);
 };
 
-/** 启动：uTools 兼容令牌 → 云端数据（本地缓存兜底）。 */
+/** 启动：先读模式；本机模式直接读本地文件，云端模式才走身份令牌。 */
 const runInitialize = async (): Promise<void> => {
   status.value = 'loading';
   lastError.value = '';
   loginPrompt.value = null;
+
+  const modeRecord = await loadLocal<{ mode?: StorageMode }>(MODE_KEY);
+  storageMode.value = modeRecord?.mode === 'cloud' ? 'cloud' : 'local';
+
+  if (storageMode.value === 'local') {
+    const cached = await loadLocal<BookState>(LOCAL_DATA_KEY);
+    state.value = cached ? normalizeState(cached) : defaultState();
+    if (!cached) {
+      schedulePersist();
+    }
+    status.value = 'ready';
+    return;
+  }
+
+  // 云端模式：uTools 兼容令牌 → 云端数据（本地缓存兜底）。
   try {
     const result = await requestUserToken();
     accessToken.value = result.token;
@@ -251,10 +281,48 @@ const runInitialize = async (): Promise<void> => {
   if (remote) {
     state.value = normalizeState(remote);
   } else if (!cached) {
-    state.value = defaultState();
-    schedulePersist();
+    // 本机切云端后的首次同步：云端还没有存档，把本机数据传上去。
+    if (pendingCloudUpload) {
+      const snapshot = pendingCloudUpload;
+      state.value = normalizeState(snapshot);
+      void withCloudToken((token) => saveCloudData(token, snapshot));
+      void saveLocal(cacheKey, snapshot);
+      pendingCloudUpload = null;
+    } else {
+      state.value = defaultState();
+      schedulePersist();
+    }
   }
   status.value = 'ready';
+};
+
+/**
+ * 切换存储模式：把当前存折写入目标存储，再初始化。
+ * 云端模式没有登录时由 initialize() 弹登录窗，登录后自动续跑并完成上传。
+ */
+export const setStorageMode = async (next: StorageMode): Promise<void> => {
+  if (next === storageMode.value) {
+    return;
+  }
+  const snapshot = snapshotState();
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  if (next === 'local') {
+    await saveLocal(LOCAL_DATA_KEY, snapshot);
+    await saveLocal(MODE_KEY, { mode: 'local' });
+    storageMode.value = 'local';
+    status.value = 'ready';
+    loginPrompt.value = null;
+    lastError.value = '';
+    return;
+  }
+  // 本机 → 云端：先记住当前数据，登录成功后作为云端初始存档上传。
+  await saveLocal(MODE_KEY, { mode: 'cloud' });
+  storageMode.value = 'cloud';
+  pendingCloudUpload = snapshot;
+  await initialize();
 };
 
 /** 登录回来后 focus 与轮询可能同时触发，这里做单飞避免重复初始化。 */

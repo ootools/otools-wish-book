@@ -16,8 +16,10 @@ import {
   loginPrompt,
   previewStarSlots,
   redeem,
+  setStorageMode,
   state,
   status,
+  storageMode,
   lastError,
 } from './store';
 
@@ -116,6 +118,13 @@ const retryInitialize = async (): Promise<void> => {
   await initialize();
 };
 
+const backToLocal = async (): Promise<void> => {
+  stopLoginWatch();
+  dismissLoginPrompt();
+  await setStorageMode('local');
+  notify('已切换到本机模式，无需登录');
+};
+
 const openReward = async (): Promise<void> => {
   if (view.value !== 'book') {
     view.value = 'book';
@@ -163,10 +172,11 @@ const confirmRedeem = async (): Promise<void> => {
 
     <div v-else-if="status === 'login'" class="center-state">
       <svg class="big"><use href="#ic-flower" /></svg>
-      <h2>请先登录 OTools 账号</h2>
-      <p>心愿存折通过宿主登录身份保存数据，不会把账号凭证交给插件。</p>
+      <h2>云端存档需要先登录</h2>
+      <p>当前选择了云端模式。也可以切回本机模式，无需登录即可使用。</p>
       <p v-if="lastError" class="err">{{ lastError }}</p>
       <div class="login-actions">
+        <button class="btn secondary" type="button" @click="backToLocal()">改用本机模式</button>
         <button class="btn secondary" type="button" @click="retryInitialize()">重试</button>
         <button class="btn" type="button" @click="goLogin()">去设置登录</button>
       </div>
@@ -214,6 +224,7 @@ const confirmRedeem = async (): Promise<void> => {
       :detail="loginPrompt.detail"
       @open-settings="goLogin"
       @retry="retryInitialize"
+      @use-local="backToLocal"
       @dismiss="dismissLoginPrompt"
     />
 

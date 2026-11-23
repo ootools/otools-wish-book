@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { activeChild, state, starCount } from '../store';
+import { activeChild, setStorageMode, state, starCount, storageMode } from '../store';
 
 const emit = defineEmits<{
   (e: 'open'): void;
@@ -32,8 +32,25 @@ const chooseChild = (id: string): void => {
         <h3>开户信息</h3>
         <div class="account-row"><span>开户人</span><b>{{ activeChild.name }}</b></div>
         <div class="account-row"><span>开户地点</span><b>温馨的家</b></div>
-        <div class="account-row"><span>本页星星</span><b>{{ starCount }} 颗</b></div>
-      </div>
+      <div class="account-row"><span>本页星星</span><b>{{ starCount }} 颗</b></div>
+      <div class="account-row"><span>存档位置</span><b>{{ storageMode === 'cloud' ? '云端（需登录）' : '本机（免登录）' }}</b></div>
+    </div>
+    <div class="mode-switch" role="group" aria-label="存档位置">
+      <button
+        type="button"
+        class="mode-btn"
+        :class="{ active: storageMode === 'local' }"
+        :disabled="storageMode === 'local'"
+        @click="setStorageMode('local')"
+      >本机</button>
+      <button
+        type="button"
+        class="mode-btn"
+        :class="{ active: storageMode === 'cloud' }"
+        :disabled="storageMode === 'cloud'"
+        @click="setStorageMode('cloud')"
+      >云端</button>
+    </div>
       <div class="child-tabs">
         <button
           v-for="child in state.children"
@@ -57,3 +74,32 @@ const chooseChild = (id: string): void => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.mode-switch {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: var(--r-pill);
+  border: 1.5px solid var(--pink-line);
+  background: #fff;
+  margin-top: 10px;
+}
+.mode-btn {
+  min-width: 64px;
+  min-height: 28px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.mode-btn.active {
+  background: var(--pink-cover);
+  color: #fff;
+  box-shadow: 0 2px 0 var(--pink-cover-d);
+}
+.mode-btn:disabled { cursor: default; }
+</style>

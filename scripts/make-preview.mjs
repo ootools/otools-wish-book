@@ -17,6 +17,11 @@ const mock = `<script>
     status: 200, headers: { 'Content-Type': 'application/json' },
   });
   let stored = null;
+  // 预览里用 sessionStorage 模拟宿主文件的跨刷新持久化（真实插件由宿主落盘）。
+  const localStore = {
+    get(key) { try { const v = sessionStorage.getItem('wish:' + key); return v === null ? null : JSON.parse(v); } catch { return null; } },
+    set(key, value) { try { sessionStorage.setItem('wish:' + key, JSON.stringify(value)); } catch {} },
+  };
   const params = new URLSearchParams(location.search);
   // ?login=0 模拟宿主未登录；?expire=1 模拟云端令牌过期一次（用于验证自动续期）。
   let loggedIn = params.get('login') !== '0';
@@ -36,8 +41,8 @@ const mock = `<script>
       loggedIn = true;
       window.alert('（预览）已模拟在设置页登录，关闭提示后回到插件会自动继续');
     },
-    async getPluginLocalStateValue() { return null; },
-    async savePluginLocalStateValue() {},
+    async getPluginLocalStateValue(_plugin, key) { return localStore.get(key); },
+    async savePluginLocalStateValue(_plugin, key, value) { localStore.set(key, value); },
   };
   const nativeFetch = window.fetch.bind(window);
   window.fetch = async (input, init) => {

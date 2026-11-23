@@ -3,6 +3,7 @@ defineProps<{ message: string; detail: string }>();
 const emit = defineEmits<{
   (e: 'open-settings'): void;
   (e: 'retry'): void;
+  (e: 'use-local'): void;
   (e: 'dismiss'): void;
 }>();
 </script>
@@ -17,7 +18,9 @@ const emit = defineEmits<{
       <p class="note">
         点击「去设置登录」会自动打开 OTools 设置 → 账号页；登录完成后回到本插件会自动继续。
       </p>
+      <p class="note">也可以切回本机模式，无需登录账号。</p>
       <div class="sheet-actions">
+        <button class="btn secondary" type="button" @click="emit('use-local')">改用本机</button>
         <button class="btn secondary" type="button" @click="emit('retry')">重试</button>
         <button class="btn" type="button" @click="emit('open-settings')">去设置登录</button>
       </div>
