@@ -22,7 +22,7 @@ const chooseChild = (id: string): void => {
 <template>
   <div class="page cover-page">
     <div class="cover-left">
-      <div class="cover-title">宝宝心愿存折</div>
+      <div class="cover-title">心愿存折</div>
       <svg class="cover-art"><use href="#cover-art" /></svg>
     </div>
     <div class="cover-right">

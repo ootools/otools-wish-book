@@ -1,8 +1,9 @@
 /**
- * xycloud 插件数据接口。
+ * xycloud wishbook 独立业务模块的数据接口。
  *
  * 身份复用 uTools 兼容的 `fetchUserServerTemporaryToken()`：插件前端只拿
  * opaque accessToken 和 pseudonymous openid，uid 留在 xycloud 服务端。
+ * 业务数据不放在 otools 平台模块，路由与表都属于 wishbook 模块。
  */
 const API_BASE = 'https://otools-api.lingyun.net/api/v1';
 const DATA_KEY = 'book-v1';
@@ -54,7 +55,7 @@ async function request<T>(path: string, body?: Record<string, unknown>): Promise
 
 /** 按「服务端解析出的 uid + packid」隔离读写；请求里不能伪造 uid。 */
 export async function loadCloudData<T>(accessToken: string): Promise<T | null> {
-  const data = await request<{ value: string | null }>('/otools/identity/data', {
+  const data = await request<{ value: string | null }>('/wishbook/book/data', {
     accessToken,
     key: DATA_KEY,
   });
@@ -69,7 +70,7 @@ export async function loadCloudData<T>(accessToken: string): Promise<T | null> {
 }
 
 export async function saveCloudData<T>(accessToken: string, value: T): Promise<void> {
-  await request('/otools/identity/data', {
+  await request('/wishbook/book/data', {
     accessToken,
     key: DATA_KEY,
     value: JSON.stringify(value),

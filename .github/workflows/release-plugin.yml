@@ -1,5 +1,5 @@
 name: release-plugin
-run-name: "宝宝心愿存折 ${{ inputs.dry_run && '验证' || '发布' }} · ${{ inputs.display_version || github.ref_name }}"
+run-name: "心愿存折 ${{ inputs.dry_run && '验证' || '发布' }} · ${{ inputs.display_version || github.ref_name }}"
 
 on:
   workflow_dispatch:

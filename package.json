@@ -1,9 +1,9 @@
 {
-  "name": "otools-baby-wish-book",
+  "name": "otools-wish-book",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Baby wish passbook plugin for OTools",
+  "description": "Wish passbook plugin for OTools",
   "engines": { "node": ">=22.18" },
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 6592 --strictPort",

@@ -141,14 +141,14 @@ defineExpose({ stickStars, stampRedeemed });
         </div>
         <div class="wish-note">
           <b>我的心愿</b>
-          <textarea :value="activeChild.hobby" readonly placeholder="在宝宝设置里填写" />
+          <textarea :value="activeChild.hobby" readonly placeholder="在孩子设置里填写" />
         </div>
         <button class="btn secondary small" type="button" @click="emit('wishes')">心愿清单 ›</button>
       </div>
     </div>
 
     <div class="bottom-bar">
-      <button class="btn secondary" type="button" @click="emit('kids')">宝宝设置</button>
+      <button class="btn secondary" type="button" @click="emit('kids')">孩子设置</button>
       <button class="btn secondary" type="button" @click="emit('wishes')">心愿清单</button>
       <button ref="rewardButton" class="btn" type="button" @click="emit('reward')">＋ 奖励星星</button>
     </div>

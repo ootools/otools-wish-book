@@ -48,8 +48,8 @@ const confirmRemove = (id: string): void => {
   <div class="page">
     <div class="page-head">
       <div>
-        <h2>我的宝宝</h2>
-        <div class="sub">每个宝宝是存折里独立的一页，星星在各页分别累计</div>
+        <h2>我的孩子</h2>
+        <div class="sub">每个孩子是存折里独立的一页，星星在各页分别累计</div>
       </div>
       <span class="page-badge">{{ state.children.length }} 页</span>
     </div>
@@ -83,11 +83,11 @@ const confirmRemove = (id: string): void => {
           </button>
         </div>
       </div>
-      <button class="btn" type="button" @click="startEdit()">＋ 添加宝宝（新增一页）</button>
+      <button class="btn" type="button" @click="startEdit()">＋ 添加孩子（新增一页）</button>
     </div>
 
     <div v-else class="sheet" style="margin: 20px auto;">
-      <h3>{{ editingId ? '编辑宝宝' : '添加宝宝' }}</h3>
+      <h3>{{ editingId ? '编辑孩子' : '添加孩子' }}</h3>
       <div class="field">
         <label>姓名</label>
         <input v-model="draft.name" maxlength="20" placeholder="例如：朵朵" />

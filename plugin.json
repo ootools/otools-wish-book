@@ -1,8 +1,8 @@
 {
-  "uuid": "otools-baby-wish-book",
-  "packid": "otools-baby-wish-book",
-  "displayName": "宝宝心愿存折",
-  "displayNameCN": "宝宝心愿存折",
+  "uuid": "otools-wish-book",
+  "packid": "otools-wish-book",
+  "displayName": "心愿存折",
+  "displayNameCN": "心愿存折",
   "developerName": "OTools",
   "summary": "粉色拟物愿望存折：多孩独立页、星星粘贴动画、全局心愿礼物清单与兑换盖章。",
   "version": "0.1.0",
@@ -15,11 +15,11 @@
   "hasAd": false,
   "inPluginPurchase": false,
   "screenshots": [],
-  "key": ["宝宝", "心愿", "存折", "星星", "奖励", "礼物", "多孩", "baby", "wish", "star"],
+  "key": ["孩子", "心愿", "存折", "星星", "奖励", "礼物", "多孩", "wish", "star"],
   "openInBrowser": false,
   "openMode": "panel",
   "panelWidth": 800,
   "panelHeight": 600,
   "permissions": [],
-  "openSourceUrl": "https://github.com/ootools/otools-baby-wish-book"
+  "openSourceUrl": "https://github.com/ootools/otools-wish-book"
 }

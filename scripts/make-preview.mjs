@@ -42,7 +42,7 @@ const mock = `<script>
   const nativeFetch = window.fetch.bind(window);
   window.fetch = async (input, init) => {
     const url = String(input);
-    if (url.includes('/otools/identity/data')) {
+    if (url.includes('/wishbook/book/data')) {
       if (expireOnce) {
         expireOnce = false;
         return new Response(JSON.stringify({ code: 401, msg: '登录已过期，请重新获取令牌', data: {} }), { status: 200 });

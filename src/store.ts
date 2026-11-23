@@ -75,7 +75,7 @@ const normalizeState = (value: unknown): BookState => {
         .filter((item): item is Child => Boolean(item && typeof item.id === 'string'))
         .map((item) => ({
           id: item.id,
-          name: String(item.name || '宝宝'),
+          name: String(item.name || '孩子'),
           birth: String(item.birth || ''),
           hobby: String(item.hobby || ''),
           avatar: item.avatar === 'av-anan' ? 'av-anan' : 'av-doudou',
@@ -212,7 +212,7 @@ const schedulePersist = (): void => {
   saveTimer = setTimeout(() => {
     const snapshot = JSON.parse(JSON.stringify(state.value)) as BookState;
     void withCloudToken((token) => saveCloudData(token, snapshot));
-    void saveLocal(`baby-wish-book:${openid.value}`, snapshot);
+    void saveLocal(`wish-book:${openid.value}`, snapshot);
   }, 200);
 };
 
@@ -237,7 +237,7 @@ const runInitialize = async (): Promise<void> => {
     return;
   }
 
-  const cacheKey = `baby-wish-book:${openid.value || 'anonymous'}`;
+  const cacheKey = `wish-book:${openid.value || 'anonymous'}`;
   const cached = await loadLocal<BookState>(cacheKey);
   if (cached) {
     state.value = normalizeState(cached);
@@ -278,7 +278,7 @@ export function setActiveChild(id: string): void {
 export function upsertChild(input: Partial<Child> & { name: string }): void {
   if (input.id && state.value.children.some((child) => child.id === input.id)) {
     const child = state.value.children.find((item) => item.id === input.id)!;
-    child.name = input.name.trim() || '宝宝';
+    child.name = input.name.trim() || '孩子';
     child.birth = input.birth || '';
     child.hobby = input.hobby || '';
     child.avatar = input.avatar || child.avatar;
@@ -286,7 +286,7 @@ export function upsertChild(input: Partial<Child> & { name: string }): void {
     const id = input.id || makeId();
     state.value.children.push({
       id,
-      name: input.name.trim() || '宝宝',
+      name: input.name.trim() || '孩子',
       birth: input.birth || '',
       hobby: input.hobby || '',
       avatar: input.avatar || 'av-doudou',
