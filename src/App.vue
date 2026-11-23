@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { playDeduct, playRedeem, playStick } from './audio';
 import CoverPage from './components/CoverPage.vue';
 import KidsSettings from './components/KidsSettings.vue';
 import LoginPrompt from './components/LoginPrompt.vue';
@@ -16,7 +17,9 @@ import {
   initialize,
   loginPrompt,
   pageIndex,
+  previewDeductSlots,
   previewStarSlots,
+  commitDeduct,
   redeem,
   setStorageMode,
   state,
@@ -29,6 +32,7 @@ type View = 'cover' | 'book' | 'kids' | 'wishes';
 const view = ref<View>('cover');
 const bookRef = ref<InstanceType<typeof StarBook> | null>(null);
 const rewardOpen = ref(false);
+const rewardMode = ref<'reward' | 'deduct'>('reward');
 const redeemId = ref('');
 const toast = ref('');
 const redeemWish = computed(() => state.value.wishes.find((wish) => wish.id === redeemId.value));
@@ -127,13 +131,17 @@ const backToLocal = async (): Promise<void> => {
   notify('已切换到本机模式，无需登录');
 };
 
-const openReward = async (): Promise<void> => {
+const openSheet = async (mode: 'reward' | 'deduct'): Promise<void> => {
   if (view.value !== 'book') {
     view.value = 'book';
     await nextTick();
   }
+  rewardMode.value = mode;
   rewardOpen.value = true;
 };
+
+const openReward = (): Promise<void> => openSheet('reward');
+const openDeduct = (): Promise<void> => openSheet('deduct');
 
 const stick = async (payload: { count: number; note: string }): Promise<void> => {
   rewardOpen.value = false;
@@ -142,7 +150,22 @@ const stick = async (payload: { count: number; note: string }): Promise<void> =>
     return;
   }
   await bookRef.value?.stickStars(payload.count, payload.note);
+  playStick();
   notify(`已贴上 ${payload.count} 颗星星`);
+};
+
+const deduct = async (payload: { count: number; note: string }): Promise<void> => {
+  rewardOpen.value = false;
+  const indexes = previewDeductSlots(payload.count);
+  if (!indexes.length) {
+    notify('当前页没有可扣除的星星');
+    return;
+  }
+  commitDeduct(indexes, payload.note);
+  await nextTick();
+  bookRef.value?.flashRemoved(indexes);
+  playDeduct();
+  notify(`已扣除 ${indexes.length} 颗星星`);
 };
 
 const confirmRedeem = async (): Promise<void> => {
@@ -159,6 +182,7 @@ const confirmRedeem = async (): Promise<void> => {
   view.value = 'book';
   await nextTick();
   bookRef.value?.stampRedeemed(indexes);
+  playRedeem();
   notify(`「${wish.name}」已兑换，${indexes.length} 颗星盖上了已兑换章`);
 };
 </script>
@@ -196,6 +220,7 @@ const confirmRedeem = async (): Promise<void> => {
         v-else-if="view === 'book'"
         ref="bookRef"
         @reward="openReward"
+        @deduct="openDeduct"
         @wishes="view = 'wishes'"
         @kids="view = 'kids'"
         @full="notify('这一页的 32 个凹槽已经贴满啦')"
@@ -208,8 +233,11 @@ const confirmRedeem = async (): Promise<void> => {
         :child-name="activeChild.name"
         :page-number="pageIndex + 1"
         :remaining="activePage.slots.filter((slot) => slot.state === 'empty').length"
+        :available="availableStars"
+        :mode="rewardMode"
         @close="rewardOpen = false"
         @stick="stick"
+        @deduct="deduct"
       />
       <RedeemSheet
         v-if="redeemWish"

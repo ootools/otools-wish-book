@@ -488,6 +488,32 @@ export function commitStars(indexes: number[], note: string): void {
   schedulePersist();
 }
 
+/** 返回将要扣除的可用星槽位索引（从当前页末尾扣，已兑换盖章的不扣）。 */
+export function previewDeductSlots(count: number): number[] {
+  const slots = activePage.value.slots;
+  const indexes: number[] = [];
+  for (let i = slots.length - 1; i >= 0 && indexes.length < count; i -= 1) {
+    if (slots[i].state === 'star') {
+      indexes.push(i);
+    }
+  }
+  return indexes;
+}
+
+/** 真正扣除星星（落在当前孩子当前页，只清可用星）。 */
+export function commitDeduct(indexes: number[], note: string): void {
+  const now = Date.now();
+  for (const index of indexes) {
+    const slot = activePage.value.slots[index];
+    if (slot && slot.state === 'star') {
+      slot.state = 'empty';
+      slot.note = note;
+      slot.at = now;
+    }
+  }
+  schedulePersist();
+}
+
 export function addWish(name: string, icon: string, cost: number): void {
   const value = Math.max(1, Math.floor(cost || 1));
   state.value.wishes.push({ id: makeId(), name: name.trim() || '心愿礼物', icon, cost: value, done: false });

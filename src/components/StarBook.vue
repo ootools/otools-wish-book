@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, type CSSProperties } from 'vue';
+import { playFlip } from '../audio';
 import {
   activeChild,
   activePage,
@@ -17,6 +18,7 @@ const emit = defineEmits<{
   (e: 'reward'): void;
   (e: 'wishes'): void;
   (e: 'kids'): void;
+  (e: 'deduct'): void;
   (e: 'full'): void;
 }>();
 
@@ -35,6 +37,7 @@ const rewardButton = ref<HTMLElement | null>(null);
 const flights = ref<Flight[]>([]);
 const justStuck = ref<number[]>([]);
 const justRedeemed = ref<number[]>([]);
+const justDeducted = ref<number[]>([]);
 const confirmingRemove = ref(false);
 let flightId = 0;
 
@@ -44,6 +47,7 @@ watch(pageIndex, () => {
   flights.value = [];
   justStuck.value = [];
   justRedeemed.value = [];
+  justDeducted.value = [];
   confirmingRemove.value = false;
 });
 
@@ -55,7 +59,25 @@ const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(
 
 /** 翻到指定页。 */
 const flipTo = (index: number): void => {
+  if (index === pageIndex.value) {
+    return;
+  }
+  playFlip();
   setActivePage(index);
+};
+
+/** 加页。 */
+const appendPage = (): void => {
+  playFlip();
+  addPage();
+};
+
+/** 扣除后闪一下空槽。 */
+const flashRemoved = (indexes: number[]): void => {
+  justDeducted.value = indexes;
+  setTimeout(() => {
+    justDeducted.value = [];
+  }, 700);
 };
 
 /** 删除当前页：连点两次确认，至少保留一页。 */
@@ -123,7 +145,7 @@ const stampRedeemed = (indexes: number[]): void => {
   }, 900);
 };
 
-defineExpose({ stickStars, stampRedeemed });
+defineExpose({ stickStars, stampRedeemed, flashRemoved });
 </script>
 
 <template>
@@ -148,7 +170,7 @@ defineExpose({ stickStars, stampRedeemed });
         :aria-selected="index === pageIndex"
         @click="flipTo(index)"
       >{{ page.title }}</button>
-      <button class="page-tab add" type="button" title="加一页" @click="addPage()">＋ 加页</button>
+      <button class="page-tab add" type="button" title="加一页" @click="appendPage">＋ 加页</button>
       <button
         class="page-tab remove"
         type="button"
@@ -173,7 +195,11 @@ defineExpose({ stickStars, stampRedeemed });
             class="star-slot"
             :class="[
               slot.state,
-              { 'just-stuck': justStuck.includes(index), 'just-redeemed': justRedeemed.includes(index) },
+              {
+                'just-stuck': justStuck.includes(index),
+                'just-redeemed': justRedeemed.includes(index),
+                'just-deducted': justDeducted.includes(index),
+              },
             ]"
             :title="slot.note || '空槽'"
           >
@@ -202,7 +228,7 @@ defineExpose({ stickStars, stampRedeemed });
 
     <div class="bottom-bar">
       <button class="btn secondary" type="button" @click="emit('kids')">孩子设置</button>
-      <button class="btn secondary" type="button" @click="emit('wishes')">心愿清单</button>
+      <button class="btn secondary" type="button" @click="emit('deduct')">－ 扣除星星</button>
       <button ref="rewardButton" class="btn" type="button" @click="emit('reward')">＋ 奖励星星</button>
     </div>
 
@@ -241,4 +267,10 @@ defineExpose({ stickStars, stampRedeemed });
 }
 .page-tab.add { border-style: dashed; }
 .page-tab.remove:disabled { opacity: .45; cursor: default; }
+.star-slot.just-deducted { animation: slot-fade 700ms ease-out; }
+@keyframes slot-fade {
+  0% { transform: scale(1); opacity: 1; }
+  45% { transform: scale(.62) rotate(-8deg); opacity: .25; }
+  100% { transform: scale(1); opacity: 1; }
+}
 </style>
