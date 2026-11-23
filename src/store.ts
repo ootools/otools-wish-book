@@ -2,8 +2,12 @@ import { computed, ref } from 'vue';
 import { ApiError, loadCloudData, saveCloudData } from './api';
 import { loadLocal, requestUserToken, saveLocal, type LoginRequiredError } from './host';
 import {
+  DEFAULT_PAGE_COUNT,
   SLOT_COUNT,
   emptySlots,
+  makePage,
+  makePages,
+  type BookPage,
   type BookState,
   type Child,
   type SlotState,
@@ -16,33 +20,33 @@ const makeId = (): string =>
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
+const DEFAULT_CHILD_ID = 'child-zihan';
+
+/** 默认只有一个孩子「子涵」，TA 的存折默认三页。 */
 const defaultState = (): BookState => ({
-  activeId: 'child-doudou',
+  activeId: DEFAULT_CHILD_ID,
+  activePageByChild: { [DEFAULT_CHILD_ID]: 0 },
   children: [
     {
-      id: 'child-doudou',
-      name: '朵朵',
-      birth: '2023-05-12',
-      hobby: '画画、小熊',
+      id: DEFAULT_CHILD_ID,
+      name: '子涵',
+      birth: '',
+      hobby: '',
       avatar: 'av-doudou',
-      slots: [
-        ...Array.from({ length: 9 }, (_, i): StarSlot => ({
-          state: i < 3 ? 'redeemed' : 'star',
-          note: i < 3 ? '已兑换' : '棒棒的表现',
-          at: Date.now() - (9 - i) * 86400000,
-        })),
-        ...emptySlots().slice(9),
-      ],
-    },
-    {
-      id: 'child-anan',
-      name: '安安',
-      birth: '2025-01-08',
-      hobby: '小兔、积木',
-      avatar: 'av-anan',
-      slots: [
-        ...Array.from({ length: 7 }, (): StarSlot => ({ state: 'star', note: '棒棒的表现', at: Date.now() })),
-        ...emptySlots().slice(7),
+      pages: [
+        makePage(0, [
+          ...Array.from({ length: 9 }, (_, i): StarSlot => ({
+            state: i < 3 ? 'redeemed' : 'star',
+            note: i < 3 ? '已兑换' : '棒棒的表现',
+            at: Date.now() - (9 - i) * 86400000,
+          })),
+          ...emptySlots().slice(9),
+        ]),
+        makePage(1, [
+          ...Array.from({ length: 7 }, (): StarSlot => ({ state: 'star', note: '棒棒的表现', at: Date.now() })),
+          ...emptySlots().slice(7),
+        ]),
+        makePage(2),
       ],
     },
   ],
@@ -68,19 +72,41 @@ const normalizeSlots = (value: unknown): StarSlot[] => {
   return slots;
 };
 
+const normalizePage = (value: unknown, index: number): BookPage => {
+  const source = value && typeof value === 'object' ? (value as Partial<BookPage>) : {};
+  return {
+    id: typeof source.id === 'string' && source.id ? source.id : `page-${index + 1}`,
+    title: typeof source.title === 'string' && source.title ? source.title : `第 ${index + 1} 页`,
+    slots: normalizeSlots(source.slots),
+  };
+};
+
+const normalizeChild = (value: unknown): Child | null => {
+  const source = value && typeof value === 'object' ? (value as Partial<Child>) : {};
+  if (typeof source.id !== 'string') {
+    return null;
+  }
+  // 兼容旧版「一个孩子一页」存档：原来的 slots 变成这个孩子存折的第一页。
+  const pages = Array.isArray(source.pages) && source.pages.length
+    ? source.pages.map(normalizePage)
+    : [makePage(0, normalizeSlots(source.slots))];
+  return {
+    id: source.id,
+    name: String(source.name || '孩子'),
+    birth: String(source.birth || ''),
+    hobby: String(source.hobby || ''),
+    avatar: source.avatar === 'av-anan' ? 'av-anan' : 'av-doudou',
+    pages,
+  };
+};
+
+const clampPage = (index: number, pageCount: number): number =>
+  Math.max(0, Math.min(pageCount - 1, Math.floor(Number(index) || 0)));
+
 const normalizeState = (value: unknown): BookState => {
   const source = value && typeof value === 'object' ? (value as Partial<BookState>) : {};
   const children: Child[] = Array.isArray(source.children)
-    ? source.children
-        .filter((item): item is Child => Boolean(item && typeof item.id === 'string'))
-        .map((item) => ({
-          id: item.id,
-          name: String(item.name || '孩子'),
-          birth: String(item.birth || ''),
-          hobby: String(item.hobby || ''),
-          avatar: item.avatar === 'av-anan' ? 'av-anan' : 'av-doudou',
-          slots: normalizeSlots(item.slots),
-        }))
+    ? source.children.map(normalizeChild).filter((child): child is Child => child !== null)
     : [];
   if (!children.length) {
     return defaultState();
@@ -97,9 +123,17 @@ const normalizeState = (value: unknown): BookState => {
           ...(typeof item.doneAt === 'number' ? { doneAt: item.doneAt } : {}),
         }))
     : [];
+  const rawPages = source.activePageByChild && typeof source.activePageByChild === 'object'
+    ? source.activePageByChild as Record<string, number>
+    : {};
+  const activePageByChild: Record<string, number> = {};
+  for (const child of children) {
+    activePageByChild[child.id] = clampPage(rawPages[child.id] ?? 0, child.pages.length);
+  }
   return {
     children,
     activeId: children.some((child) => child.id === source.activeId) ? String(source.activeId) : children[0].id,
+    activePageByChild,
     wishes,
   };
 };
@@ -124,9 +158,21 @@ export const activeChild = computed<Child>(
   () => state.value.children.find((child) => child.id === state.value.activeId) || state.value.children[0],
 );
 export const childIndex = computed(() => Math.max(0, state.value.children.findIndex((c) => c.id === activeChild.value.id)));
-export const starCount = computed(() => activeChild.value.slots.filter((slot) => slot.state !== 'empty').length);
-export const redeemedCount = computed(() => activeChild.value.slots.filter((slot) => slot.state === 'redeemed').length);
+/** 当前孩子在 TA 存折中翻到的页。 */
+export const pageIndex = computed(() =>
+  clampPage(state.value.activePageByChild[activeChild.value.id] ?? 0, activeChild.value.pages.length),
+);
+export const activePage = computed<BookPage>(
+  () => activeChild.value.pages[pageIndex.value] || activeChild.value.pages[0],
+);
+export const starCount = computed(() => activePage.value.slots.filter((slot) => slot.state !== 'empty').length);
+export const redeemedCount = computed(() => activePage.value.slots.filter((slot) => slot.state === 'redeemed').length);
 export const availableStars = computed(() => starCount.value - redeemedCount.value);
+
+/** 一个孩子所有页的星星总数（封面/孩子列表展示用）。 */
+export const starCountOf = (child: Child): number =>
+  child.pages.reduce((sum, page) => sum + page.slots.filter((slot) => slot.state !== 'empty').length, 0);
+export const pageCountOf = (child: Child): number => child.pages.length;
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -283,8 +329,8 @@ const runInitialize = async (): Promise<void> => {
   } else if (!cached) {
     // 本机切云端后的首次同步：云端还没有存档，把本机数据传上去。
     if (pendingCloudUpload) {
-      const snapshot = pendingCloudUpload;
-      state.value = normalizeState(snapshot);
+      const snapshot = normalizeState(pendingCloudUpload);
+      state.value = snapshot;
       void withCloudToken((token) => saveCloudData(token, snapshot));
       void saveLocal(cacheKey, snapshot);
       pendingCloudUpload = null;
@@ -337,10 +383,45 @@ export function initialize(): Promise<void> {
 }
 
 export function setActiveChild(id: string): void {
-  if (!state.value.children.some((child) => child.id === id)) {
+  const child = state.value.children.find((item) => item.id === id);
+  if (!child) {
     return;
   }
   state.value.activeId = id;
+  if (state.value.activePageByChild[id] === undefined) {
+    state.value.activePageByChild[id] = 0;
+  }
+  schedulePersist();
+}
+
+/** 翻到当前孩子存折的指定页。 */
+export function setActivePage(index: number): void {
+  const child = activeChild.value;
+  state.value.activePageByChild[child.id] = clampPage(index, child.pages.length);
+  schedulePersist();
+}
+
+/** 在当前孩子的存折末尾加一页。 */
+export function addPage(): void {
+  const child = activeChild.value;
+  child.pages.push(makePage(child.pages.length));
+  state.value.activePageByChild[child.id] = child.pages.length - 1;
+  schedulePersist();
+}
+
+/** 删除当前孩子存折的指定页，至少保留一页。 */
+export function removePage(index: number): void {
+  const child = activeChild.value;
+  if (child.pages.length <= 1) {
+    return;
+  }
+  child.pages.splice(clampPage(index, child.pages.length), 1);
+  child.pages.forEach((page, i) => {
+    page.id = `page-${i + 1}`;
+    page.title = `第 ${i + 1} 页`;
+  });
+  state.value.activePageByChild[child.id] = clampPage(index, child.pages.length);
+  schedulePersist();
 }
 
 export function upsertChild(input: Partial<Child> & { name: string }): void {
@@ -350,6 +431,9 @@ export function upsertChild(input: Partial<Child> & { name: string }): void {
     child.birth = input.birth || '';
     child.hobby = input.hobby || '';
     child.avatar = input.avatar || child.avatar;
+    if (!child.pages?.length) {
+      child.pages = makePages(DEFAULT_PAGE_COUNT);
+    }
   } else {
     const id = input.id || makeId();
     state.value.children.push({
@@ -358,9 +442,10 @@ export function upsertChild(input: Partial<Child> & { name: string }): void {
       birth: input.birth || '',
       hobby: input.hobby || '',
       avatar: input.avatar || 'av-doudou',
-      slots: emptySlots(),
+      pages: makePages(DEFAULT_PAGE_COUNT),
     });
     state.value.activeId = id;
+    state.value.activePageByChild[id] = 0;
   }
   schedulePersist();
 }
@@ -370,15 +455,16 @@ export function removeChild(id: string): void {
     return;
   }
   state.value.children = state.value.children.filter((child) => child.id !== id);
+  delete state.value.activePageByChild[id];
   if (state.value.activeId === id) {
     state.value.activeId = state.value.children[0].id;
   }
   schedulePersist();
 }
 
-/** 返回将要贴星的槽位索引；满 32 槽时返回空数组。 */
+/** 返回当前页将要贴星的槽位索引；满 32 槽时返回空数组。 */
 export function previewStarSlots(count: number): number[] {
-  const slots = activeChild.value.slots;
+  const slots = activePage.value.slots;
   const indexes: number[] = [];
   for (let i = 0; i < slots.length && indexes.length < count; i += 1) {
     if (slots[i].state === 'empty') {
@@ -388,11 +474,11 @@ export function previewStarSlots(count: number): number[] {
   return indexes;
 }
 
-/** 真正写入星星（动画结束后调用）。 */
+/** 真正写入星星（动画结束后调用，落在当前孩子当前页）。 */
 export function commitStars(indexes: number[], note: string): void {
   const now = Date.now();
   for (const index of indexes) {
-    const slot = activeChild.value.slots[index];
+    const slot = activePage.value.slots[index];
     if (slot && slot.state === 'empty') {
       slot.state = 'star';
       slot.note = note;
@@ -413,21 +499,22 @@ export function removeWish(id: string): void {
   schedulePersist();
 }
 
-/** 兑换：从当前页扣对应数量的可用星星，并盖上已兑换章。 */
+/** 兑换：从当前孩子当前页扣对应数量的可用星星，并盖上已兑换章。 */
 export function redeem(wishId: string): number[] {
   const wish = state.value.wishes.find((item) => item.id === wishId);
   if (!wish || wish.done || availableStars.value < wish.cost) {
     return [];
   }
+  const slots = activePage.value.slots;
   const indexes: number[] = [];
-  for (let i = 0; i < activeChild.value.slots.length && indexes.length < wish.cost; i += 1) {
-    if (activeChild.value.slots[i].state === 'star') {
+  for (let i = 0; i < slots.length && indexes.length < wish.cost; i += 1) {
+    if (slots[i].state === 'star') {
       indexes.push(i);
     }
   }
   const now = Date.now();
   for (const index of indexes) {
-    const slot = activeChild.value.slots[index];
+    const slot = slots[index];
     slot.state = 'redeemed';
     slot.note = `兑换：${wish.name}`;
     slot.at = now;

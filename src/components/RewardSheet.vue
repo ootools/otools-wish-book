@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 
-defineProps<{ childName: string; remaining: number }>();
+defineProps<{ childName: string; pageNumber: number; remaining: number }>();
 const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'stick', payload: { count: number; note: string }): void;
@@ -22,7 +22,7 @@ const submit = (): void => {
   <div class="sheet-mask" @click.self="emit('close')">
     <div class="sheet">
       <h3>奖励星星</h3>
-      <div class="hint">贴到「{{ childName }}」的这一页 · 当前剩余 {{ remaining }} 个空槽</div>
+      <div class="hint">贴到「{{ childName }}」存折第 {{ pageNumber }} 页 · 当前剩余 {{ remaining }} 个空槽</div>
       <div class="field">
         <label>数量</label>
         <div class="qty-row">

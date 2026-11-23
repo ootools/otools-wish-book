@@ -29,13 +29,13 @@ const save = (): void => {
     <div class="page-head">
       <div>
         <h2>心愿礼物</h2>
-        <div class="sub">独立清单 · 所有页共用</div>
+        <div class="sub">独立清单 · 所有孩子的每份存折共用</div>
       </div>
       <span class="page-badge">当前页可用 {{ availableStars }} ★</span>
     </div>
 
     <div class="wish-banner">
-      此清单与任何孩子的页都不挂钩：切换页、切孩子，礼物与进度始终不变。兑换时从<b>当前页</b>扣除星星。
+      此清单不与任何孩子或页面绑定：翻页、切换孩子，礼物与进度始终不变。兑换时从<b>当前孩子存折的当前页</b>扣除星星。
     </div>
 
     <div class="wish-grid">

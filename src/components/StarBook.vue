@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { ref, type CSSProperties } from 'vue';
+import { ref, watch, type CSSProperties } from 'vue';
 import {
   activeChild,
-  childIndex,
+  activePage,
+  addPage,
   commitStars,
+  pageIndex,
   previewStarSlots,
   redeemedCount,
+  removePage,
+  setActivePage,
   starCount,
 } from '../store';
 
@@ -31,7 +35,17 @@ const rewardButton = ref<HTMLElement | null>(null);
 const flights = ref<Flight[]>([]);
 const justStuck = ref<number[]>([]);
 const justRedeemed = ref<number[]>([]);
+const confirmingRemove = ref(false);
 let flightId = 0;
+
+// 翻页后旧的 DOM 引用失效，动画状态也要清掉。
+watch(pageIndex, () => {
+  slotRefs.value = [];
+  flights.value = [];
+  justStuck.value = [];
+  justRedeemed.value = [];
+  confirmingRemove.value = false;
+});
 
 const setSlotRef = (el: unknown, index: number): void => {
   slotRefs.value[index] = (el as HTMLElement | null) ?? null;
@@ -39,7 +53,25 @@ const setSlotRef = (el: unknown, index: number): void => {
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** 贴星动画：星星从按钮飞向目标凹槽，落下后再真正写入数据。 */
+/** 翻到指定页。 */
+const flipTo = (index: number): void => {
+  setActivePage(index);
+};
+
+/** 删除当前页：连点两次确认，至少保留一页。 */
+const deleteCurrentPage = (): void => {
+  if (confirmingRemove.value) {
+    confirmingRemove.value = false;
+    removePage(pageIndex.value);
+    return;
+  }
+  confirmingRemove.value = true;
+  setTimeout(() => {
+    confirmingRemove.value = false;
+  }, 3000);
+};
+
+/** 贴星动画：星星从按钮飞向当前页的目标凹槽，落下后再真正写入数据。 */
 const stickStars = async (count: number, note: string): Promise<void> => {
   const indexes = previewStarSlots(count);
   if (!indexes.length) {
@@ -99,10 +131,31 @@ defineExpose({ stickStars, stampRedeemed });
     <div class="page-head">
       <div class="avatar"><svg><use :href="`#${activeChild.avatar}`" /></svg></div>
       <div>
-        <h2>{{ activeChild.name }}的集星页</h2>
-        <div class="sub">把星星贴进凹槽里吧 ✦</div>
+        <h2>{{ activeChild.name }}的存折</h2>
+        <div class="sub">每一页都记录棒棒的表现 ✦</div>
       </div>
-      <span class="page-badge">第 {{ childIndex + 1 }} 页</span>
+      <span class="page-badge">第 {{ pageIndex + 1 }} / {{ activeChild.pages.length }} 页</span>
+    </div>
+
+    <div class="page-strip" role="tablist" aria-label="存折页">
+      <button
+        v-for="(page, index) in activeChild.pages"
+        :key="page.id"
+        class="page-tab"
+        :class="{ active: index === pageIndex }"
+        type="button"
+        role="tab"
+        :aria-selected="index === pageIndex"
+        @click="flipTo(index)"
+      >{{ page.title }}</button>
+      <button class="page-tab add" type="button" title="加一页" @click="addPage()">＋ 加页</button>
+      <button
+        class="page-tab remove"
+        type="button"
+        :disabled="activeChild.pages.length <= 1"
+        :title="confirmingRemove ? '再点一次确认删除当前页' : '删除当前页'"
+        @click="deleteCurrentPage"
+      >{{ confirmingRemove ? '确认删？' : '删页' }}</button>
     </div>
 
     <div class="book-layout">
@@ -114,7 +167,7 @@ defineExpose({ stickStars, stampRedeemed });
         </div>
         <div class="star-grid">
           <div
-            v-for="(slot, index) in activeChild.slots"
+            v-for="(slot, index) in activePage.slots"
             :key="index"
             :ref="(el) => setSlotRef(el, index)"
             class="star-slot"
@@ -137,7 +190,7 @@ defineExpose({ stickStars, stampRedeemed });
       <div class="side-card">
         <div class="count-big">
           <div class="num"><svg><use href="#ic-star" /></svg>{{ starCount }}</div>
-          <div class="cap">本页累计 · 切页各自显示</div>
+          <div class="cap">本页累计 · 各页分别统计</div>
         </div>
         <div class="wish-note">
           <b>我的心愿</b>
@@ -160,3 +213,32 @@ defineExpose({ stickStars, stampRedeemed });
     </div>
   </div>
 </template>
+
+<style scoped>
+.page-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 2px 8px;
+}
+.page-tab {
+  flex: 0 0 auto;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1.5px solid var(--pink-line);
+  border-radius: var(--r-pill);
+  background: #fff;
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.page-tab.active {
+  background: var(--pink-cover);
+  border-color: var(--pink-cover);
+  color: #fff;
+}
+.page-tab.add { border-style: dashed; }
+.page-tab.remove:disabled { opacity: .45; cursor: default; }
+</style>

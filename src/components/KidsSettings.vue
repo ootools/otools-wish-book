@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { removeChild, setActiveChild, state, upsertChild } from '../store';
+import { pageCountOf, removeChild, setActiveChild, starCountOf, state, upsertChild } from '../store';
 import type { Child } from '../types';
 
 const emit = defineEmits<{ (e: 'back'): void }>();
@@ -8,8 +8,6 @@ const emit = defineEmits<{ (e: 'back'): void }>();
 const editingId = ref<string | null>(null);
 const draft = ref({ name: '', birth: '', hobby: '', avatar: 'av-doudou' });
 const confirmingId = ref<string | null>(null);
-
-const starCount = (child: Child): number => child.slots.filter((slot) => slot.state !== 'empty').length;
 
 const startEdit = (child?: Child): void => {
   editingId.value = child?.id ?? '';
@@ -49,9 +47,9 @@ const confirmRemove = (id: string): void => {
     <div class="page-head">
       <div>
         <h2>我的孩子</h2>
-        <div class="sub">每个孩子是存折里独立的一页，星星在各页分别累计</div>
+        <div class="sub">每个孩子一份存折，每份存折可以翻多页，星星按页分别累计</div>
       </div>
-      <span class="page-badge">{{ state.children.length }} 页</span>
+      <span class="page-badge">{{ state.children.length }} 份</span>
     </div>
 
     <div v-if="editingId === null" class="kid-list">
@@ -65,14 +63,14 @@ const confirmRemove = (id: string): void => {
         <div class="kid-meta">
           <strong>{{ child.name }}</strong>
           <div>编号 {{ child.id.slice(-4) }} · 出生 {{ child.birth || '未填写' }} · {{ child.hobby || '爱好未填写' }}</div>
-          <div v-if="child.id === state.activeId">当前页</div>
+          <div v-if="child.id === state.activeId">当前存折</div>
         </div>
         <div class="kid-stat">
-          <div class="n">{{ starCount(child) }} ★</div>
-          <div class="cap">本页星星</div>
+          <div class="n">{{ starCountOf(child) }} ★</div>
+          <div class="cap">共 {{ pageCountOf(child) }} 页</div>
         </div>
         <div class="kid-actions">
-          <button class="icon-btn" type="button" title="设为当前页" @click="setActiveChild(child.id)">
+          <button class="icon-btn" type="button" title="设为当前存折" @click="setActiveChild(child.id)">
             <svg><use href="#ic-book" /></svg>
           </button>
           <button class="icon-btn" type="button" title="编辑" @click="startEdit(child)">
@@ -83,14 +81,14 @@ const confirmRemove = (id: string): void => {
           </button>
         </div>
       </div>
-      <button class="btn" type="button" @click="startEdit()">＋ 添加孩子（新增一页）</button>
+      <button class="btn" type="button" @click="startEdit()">＋ 添加孩子（新建一份存折）</button>
     </div>
 
     <div v-else class="sheet" style="margin: 20px auto;">
       <h3>{{ editingId ? '编辑孩子' : '添加孩子' }}</h3>
       <div class="field">
         <label>姓名</label>
-        <input v-model="draft.name" maxlength="20" placeholder="例如：朵朵" />
+        <input v-model="draft.name" maxlength="20" placeholder="例如：子涵" />
       </div>
       <div class="field">
         <label>出生日期</label>

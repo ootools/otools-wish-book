@@ -10,10 +10,12 @@ import WishList from './components/WishList.vue';
 import { hostApiVersion, openLoginSettings } from './host';
 import {
   activeChild,
+  activePage,
   availableStars,
   dismissLoginPrompt,
   initialize,
   loginPrompt,
+  pageIndex,
   previewStarSlots,
   redeem,
   setStorageMode,
@@ -204,7 +206,8 @@ const confirmRedeem = async (): Promise<void> => {
       <RewardSheet
         v-if="rewardOpen"
         :child-name="activeChild.name"
-        :remaining="activeChild.slots.filter((slot) => slot.state === 'empty').length"
+        :page-number="pageIndex + 1"
+        :remaining="activePage.slots.filter((slot) => slot.state === 'empty').length"
         @close="rewardOpen = false"
         @stick="stick"
       />
@@ -213,6 +216,7 @@ const confirmRedeem = async (): Promise<void> => {
         :wish="redeemWish"
         :available="availableStars"
         :child-name="activeChild.name"
+        :page-number="pageIndex + 1"
         @close="redeemId = ''"
         @confirm="confirmRedeem"
       />

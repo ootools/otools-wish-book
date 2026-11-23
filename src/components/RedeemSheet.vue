@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Wish } from '../types';
 
-defineProps<{ wish: Wish; available: number; childName: string }>();
+defineProps<{ wish: Wish; available: number; childName: string; pageNumber: number }>();
 const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'confirm'): void;
@@ -12,7 +12,7 @@ const emit = defineEmits<{
   <div class="sheet-mask" @click.self="emit('close')">
     <div class="sheet">
       <h3>兑换心愿券</h3>
-      <div class="hint">将从「{{ childName }}」这一页扣除星星</div>
+      <div class="hint">将从「{{ childName }}」存折第 {{ pageNumber }} 页扣除星星</div>
       <div class="ticket">
         <h4>{{ wish.name }}</h4>
         <div class="cost"><svg><use href="#ic-star" /></svg>消耗 {{ wish.cost }} 颗星</div>

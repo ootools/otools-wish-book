@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { activeChild, setStorageMode, state, starCount, storageMode } from '../store';
+import {
+  activeChild,
+  pageCountOf,
+  setActiveChild,
+  setStorageMode,
+  starCountOf,
+  state,
+  storageMode,
+} from '../store';
 
 const emit = defineEmits<{
   (e: 'open'): void;
@@ -10,13 +18,7 @@ const emit = defineEmits<{
 }>();
 
 const childCount = computed(() => state.value.children.length);
-const starsOf = (id: string): number => {
-  const child = state.value.children.find((item) => item.id === id);
-  return child ? child.slots.filter((slot) => slot.state !== 'empty').length : 0;
-};
-const chooseChild = (id: string): void => {
-  state.value.activeId = id;
-};
+const chooseChild = (id: string): void => setActiveChild(id);
 </script>
 
 <template>
@@ -32,25 +34,26 @@ const chooseChild = (id: string): void => {
         <h3>开户信息</h3>
         <div class="account-row"><span>开户人</span><b>{{ activeChild.name }}</b></div>
         <div class="account-row"><span>开户地点</span><b>温馨的家</b></div>
-      <div class="account-row"><span>本页星星</span><b>{{ starCount }} 颗</b></div>
-      <div class="account-row"><span>存档位置</span><b>{{ storageMode === 'cloud' ? '云端（需登录）' : '本机（免登录）' }}</b></div>
-    </div>
-    <div class="mode-switch" role="group" aria-label="存档位置">
-      <button
-        type="button"
-        class="mode-btn"
-        :class="{ active: storageMode === 'local' }"
-        :disabled="storageMode === 'local'"
-        @click="setStorageMode('local')"
-      >本机</button>
-      <button
-        type="button"
-        class="mode-btn"
-        :class="{ active: storageMode === 'cloud' }"
-        :disabled="storageMode === 'cloud'"
-        @click="setStorageMode('cloud')"
-      >云端</button>
-    </div>
+        <div class="account-row"><span>存折页数</span><b>{{ pageCountOf(activeChild) }} 页</b></div>
+        <div class="account-row"><span>存折星星</span><b>{{ starCountOf(activeChild) }} 颗</b></div>
+        <div class="account-row"><span>存档位置</span><b>{{ storageMode === 'cloud' ? '云端（需登录）' : '本机（免登录）' }}</b></div>
+      </div>
+      <div class="mode-switch" role="group" aria-label="存档位置">
+        <button
+          type="button"
+          class="mode-btn"
+          :class="{ active: storageMode === 'local' }"
+          :disabled="storageMode === 'local'"
+          @click="setStorageMode('local')"
+        >本机</button>
+        <button
+          type="button"
+          class="mode-btn"
+          :class="{ active: storageMode === 'cloud' }"
+          :disabled="storageMode === 'cloud'"
+          @click="setStorageMode('cloud')"
+        >云端</button>
+      </div>
       <div class="child-tabs">
         <button
           v-for="child in state.children"
@@ -62,11 +65,11 @@ const chooseChild = (id: string): void => {
         >
           <svg class="av"><use :href="`#${child.avatar}`" /></svg>
           <span>{{ child.name }}</span>
-          <span class="star-mini"><svg><use href="#ic-star" /></svg>{{ starsOf(child.id) }}</span>
+          <span class="star-mini"><svg><use href="#ic-star" /></svg>{{ starCountOf(child) }}</span>
         </button>
         <button class="child-tab" type="button" @click="emit('kids')">
           <svg class="av"><use href="#ic-plus" /></svg>
-          <span>添加页（{{ childCount }}）</span>
+          <span>管理孩子（{{ childCount }}）</span>
         </button>
       </div>
       <button class="btn" type="button" @click="emit('open')">打开存折 ›</button>
