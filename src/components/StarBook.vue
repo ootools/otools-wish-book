@@ -15,6 +15,7 @@ import {
 } from '../store';
 
 const emit = defineEmits<{
+  (e: 'cover'): void;
   (e: 'reward'): void;
   (e: 'wishes'): void;
   (e: 'kids'): void;
@@ -160,6 +161,7 @@ defineExpose({ stickStars, stampRedeemed, flashRemoved });
     </div>
 
     <div class="page-strip" role="tablist" aria-label="存折页">
+      <button class="page-tab cover" type="button" title="返回存折封面" @click="emit('cover')">‹ 封面</button>
       <button
         v-for="(page, index) in activeChild.pages"
         :key="page.id"
@@ -265,6 +267,7 @@ defineExpose({ stickStars, stampRedeemed, flashRemoved });
   border-color: var(--pink-cover);
   color: #fff;
 }
+.page-tab.cover { background: #fff6f0; border-color: #e8b99e; color: #a25b3c; }
 .page-tab.add { border-style: dashed; }
 .page-tab.remove:disabled { opacity: .45; cursor: default; }
 .star-slot.just-deducted { animation: slot-fade 700ms ease-out; }

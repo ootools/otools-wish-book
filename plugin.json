@@ -5,7 +5,7 @@
   "displayNameCN": "心愿存折",
   "developerName": "OTools",
   "summary": "粉色拟物心愿存折：每个孩子一份存折、存折内多页，星星奖励/扣除动画与音效、全局心愿礼物清单与兑换盖章。",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "minOtoolsVersion": "0.9.8",
   "entry": "dist/index.html",
   "devUrl": "http://127.0.0.1:6592",

@@ -219,6 +219,7 @@ const confirmRedeem = async (): Promise<void> => {
       <StarBook
         v-else-if="view === 'book'"
         ref="bookRef"
+        @cover="view = 'cover'"
         @reward="openReward"
         @deduct="openDeduct"
         @wishes="view = 'wishes'"
