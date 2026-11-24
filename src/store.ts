@@ -33,27 +33,14 @@ const defaultState = (): BookState => ({
       birth: '',
       hobby: '',
       avatar: 'av-doudou',
-      pages: [
-        makePage(0, [
-          ...Array.from({ length: 9 }, (_, i): StarSlot => ({
-            state: i < 3 ? 'redeemed' : 'star',
-            note: i < 3 ? '已兑换' : '棒棒的表现',
-            at: Date.now() - (9 - i) * 86400000,
-          })),
-          ...emptySlots().slice(9),
-        ]),
-        makePage(1, [
-          ...Array.from({ length: 7 }, (): StarSlot => ({ state: 'star', note: '棒棒的表现', at: Date.now() })),
-          ...emptySlots().slice(7),
-        ]),
-        makePage(2),
-      ],
+      // 默认是一份全新的空白存折：三页都没有星星，也没有已兑换记录。
+      pages: makePages(DEFAULT_PAGE_COUNT),
     },
   ],
   wishes: [
     { id: 'wish-carousel', name: '旋转木马', icon: 'ic-carousel', cost: 25, done: false },
     { id: 'wish-picnic', name: '亲子野餐', icon: 'ic-picnic', cost: 15, done: false },
-    { id: 'wish-sticker', name: '贴纸绘本', icon: 'ic-gift', cost: 10, done: true, doneAt: Date.now() },
+    { id: 'wish-sticker', name: '贴纸绘本', icon: 'ic-gift', cost: 10, done: false },
   ],
 });
 
